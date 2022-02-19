@@ -1,0 +1,9 @@
+providers:
+  - airtap-playwright
+
+browsers:
+  - name: chromium
+  - name: webkit
+  # Firefox does not support WritableStream
+  # See https://developer.mozilla.org/en-US/docs/Web/API/WritableStream/WritableStream
+  # - name: firefox

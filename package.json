@@ -1,0 +1,64 @@
+{
+  "name": "level-web-stream",
+  "version": "0.0.0",
+  "description": "Read from an abstract-level database using Web Streams",
+  "license": "MIT",
+  "scripts": {
+    "test": "standard && ts-standard *.ts && hallmark && npm run test-browsers-local && (nyc -s node test.js | faucet) && nyc report",
+    "test-browsers-local": "airtap --coverage test.js",
+    "coverage": "nyc report -r lcovonly"
+  },
+  "main": "index.js",
+  "types": "./index.d.ts",
+  "browser": {
+    "./streams.js": "streams-browser.js"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "streams.js",
+    "streams-browser.js",
+    "CHANGELOG.md",
+    "UPGRADING.md"
+  ],
+  "peerDependencies": {
+    "abstract-level": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "abstract-level": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@voxpelli/tsconfig": "^3.1.0",
+    "airtap": "^4.0.3",
+    "airtap-playwright": "^1.0.1",
+    "faucet": "^0.0.1",
+    "hallmark": "^4.0.0",
+    "memory-level": "^1.0.0",
+    "nyc": "^15.1.0",
+    "standard": "^16.0.3",
+    "tape": "^5.0.1",
+    "ts-standard": "^11.0.0",
+    "typescript": "^4.5.5"
+  },
+  "standard": {
+    "globals": [
+      "ReadableStream",
+      "WritableStream",
+      "CountQueuingStrategy",
+      "AbortController"
+    ]
+  },
+  "repository": "Level/web-stream",
+  "homepage": "https://github.com/Level/web-stream",
+  "keywords": [
+    "level",
+    "stream",
+    "web-streams",
+    "abstract-level"
+  ],
+  "engines": {
+    "node": ">=16.5.0"
+  }
+}
