@@ -18,6 +18,8 @@ jobs:
           node-version: ${{ matrix.node }}
       - name: Install
         run: npm install
+      - name: Install Playwright
+        run: npx playwright install-deps
       - name: Test
         run: npm test
       - name: Coverage
