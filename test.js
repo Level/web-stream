@@ -2,8 +2,8 @@
 
 const test = require('tape')
 const { MemoryLevel } = require('memory-level')
-const { WritableStream } = require('./streams')
-const { EntryStream, KeyStream, ValueStream } = require('.')
+const { ReadableStream, WritableStream } = require('./streams')
+const { EntryStream, KeyStream, ValueStream, BatchStream } = require('.')
 
 let db
 let lastIterator
@@ -117,9 +117,162 @@ for (const Ctor of [EntryStream, KeyStream, ValueStream]) {
   })
 }
 
+// Done with readable stream tests; subsequent tests use a fresh db
 test('teardown', function (t) {
   return db.close()
 })
+
+test('BatchStream: basic default operation', async function (t) {
+  const { db, batchCalls } = await monkeyBatched()
+  const stream = new BatchStream(db)
+
+  await from([{ key: 'a', value: '1' }]).pipeTo(stream)
+
+  t.same(await db.iterator().all(), [['a', '1']])
+  t.same(batchCalls, [[[{ key: 'a', value: '1', type: 'put' }], {}]])
+})
+
+test('BatchStream: basic put operation', async function (t) {
+  const { db, batchCalls } = await monkeyBatched()
+
+  await from([{ type: 'put', key: 'a', value: '1' }]).pipeTo(new BatchStream(db))
+  await from([{ key: 'b', value: '2' }]).pipeTo(new BatchStream(db, { type: 'put' }))
+
+  t.same(await db.iterator().all(), [['a', '1'], ['b', '2']])
+  t.same(batchCalls, [
+    [[{ key: 'a', value: '1', type: 'put' }], {}],
+    [[{ key: 'b', value: '2', type: 'put' }], {}]
+  ])
+})
+
+test('BatchStream: basic del operation', async function (t) {
+  const { db, batchCalls } = await monkeyBatched()
+
+  await db.put('a', '1')
+  await db.put('b', '2')
+
+  t.same(await db.iterator().all(), [['a', '1'], ['b', '2']])
+
+  await from([{ type: 'del', key: 'a' }]).pipeTo(new BatchStream(db))
+  await from([{ key: 'b' }]).pipeTo(new BatchStream(db, { type: 'del' }))
+
+  t.same(await db.iterator().all(), [])
+  t.same(batchCalls, [
+    [[{ key: 'a', type: 'del' }], {}],
+    [[{ key: 'b', type: 'del' }], {}]
+  ])
+})
+
+test('BatchStream: operation type takes precedence', async function (t) {
+  const { db } = await monkeyBatched()
+
+  await db.put('a', '1')
+  t.same(await db.values().all(), ['1'])
+
+  await from([{ type: 'put', key: 'a', value: '2' }]).pipeTo(new BatchStream(db, { type: 'del' }))
+  t.same(await db.values().all(), ['2'])
+})
+
+test('BatchStream: basic operation with custom property', async function (t) {
+  const { db, batchCalls } = await monkeyBatched()
+  const stream = new BatchStream(db)
+  await from([{ key: 'a', value: '1', foo: 123 }]).pipeTo(stream)
+  t.same(batchCalls, [[[{ key: 'a', value: '1', foo: 123, type: 'put' }], {}]])
+})
+
+test('BatchStream: basic operation with options', async function (t) {
+  const { db, batchCalls } = await monkeyBatched()
+  const stream = new BatchStream(db, { foo: 123 })
+  await from([{ key: 'a', type: 'del' }]).pipeTo(stream)
+  t.same(batchCalls, [[[{ key: 'a', type: 'del' }], { foo: 123 }]])
+})
+
+test('BatchStream: basic entry', async function (t) {
+  const { db, batchCalls } = await monkeyBatched()
+  await from([['a', '1']]).pipeTo(new BatchStream(db))
+
+  t.same(await db.iterator().all(), [['a', '1']])
+  t.same(batchCalls, [[[{ key: 'a', value: '1', type: 'put' }], {}]])
+})
+
+test('BatchStream: basic entry with del type', async function (t) {
+  const { db, batchCalls } = await monkeyBatched()
+
+  await db.put('a', '1')
+  await db.put('b', '2')
+
+  t.same(await db.iterator().all(), [['a', '1'], ['b', '2']])
+
+  await from([['a', '1']]).pipeTo(new BatchStream(db, { type: 'del' }))
+  await from([['b']]).pipeTo(new BatchStream(db, { type: 'del' }))
+
+  t.same(await db.iterator().all(), [])
+  t.same(batchCalls, [
+    [[{ key: 'a', value: '1', type: 'del' }], {}],
+    [[{ key: 'b', value: undefined, type: 'del' }], {}]
+  ])
+})
+
+test('BatchStream: uses batches of fixed size', async function (t) {
+  const { db, batchCalls } = await monkeyBatched()
+  const entries = new Array(17).fill().map((_, i) => [String(i), String(i)])
+
+  await from(entries).pipeTo(new BatchStream(db, { highWaterMark: 5 }))
+
+  t.is(batchCalls.length, 4, '4 batches')
+  t.same(batchCalls.map(args => args[0].length), [5, 5, 5, 2], 'batch size is fixed')
+})
+
+test('BatchStream: flushes remainder on close', async function (t) {
+  const { db, batchCalls } = await monkeyBatched()
+  const entries = new Array(5).fill().map((_, i) => [String(i), String(i)])
+
+  await from(entries).pipeTo(new BatchStream(db, { highWaterMark: 1e3 }))
+
+  t.is(batchCalls.length, 1, '1 batch')
+  t.is(batchCalls[0][0].length, 5, '5 operations')
+})
+
+test('BatchStream: does not batch() in parallel', async function (t) {
+  t.plan(5)
+
+  const db = new MemoryLevel()
+  const originalBatch = db.batch
+  const entries = new Array(10).fill().map((_, i) => [String(i), String(i)])
+
+  // Our monkey-patched batch() does not handle deferred open
+  await db.open()
+
+  let inflight = 0
+
+  db.batch = async function (...args) {
+    t.is(inflight++, 0, 'not parallel')
+
+    await originalBatch.apply(this, args)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    inflight = 0
+  }
+
+  await from(entries).pipeTo(new BatchStream(db, { highWaterMark: 2 }))
+})
+
+// Create a fresh db with a spy on batch()
+const monkeyBatched = async function () {
+  const db = new MemoryLevel()
+  const originalBatch = db.batch
+  const batchCalls = []
+
+  db.batch = function (...args) {
+    batchCalls.push(args)
+    return originalBatch.apply(this, args)
+  }
+
+  // Our monkey-patched batch() does not handle deferred open
+  await db.open()
+
+  return { db, batchCalls }
+}
 
 const monitor = function () {
   const order = []
@@ -146,4 +299,19 @@ const concat = async function (stream) {
   }))
 
   return items
+}
+
+// Create a readable stream from an array of items
+const from = function (items) {
+  let position = 0
+
+  return new ReadableStream({
+    pull (controller) {
+      if (position >= items.length) {
+        controller.close()
+      } else {
+        controller.enqueue(items[position++])
+      }
+    }
+  })
 }

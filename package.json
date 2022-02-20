@@ -1,11 +1,13 @@
 {
   "name": "level-web-stream",
   "version": "1.0.0",
-  "description": "Read from an abstract-level database using Web Streams",
+  "description": "Read and write to an abstract-level database using Web Streams",
   "license": "MIT",
   "scripts": {
-    "test": "standard && ts-standard *.ts && hallmark && npm run test-browsers-local && (nyc -s node test.js | faucet) && nyc report",
+    "test": "npm run lint && npm run test-browsers-local && npm run test-node",
+    "test-node": "(nyc -s node test.js | faucet) && nyc report",
     "test-browsers-local": "airtap --coverage test.js",
+    "lint": "standard && ts-standard *.ts && hallmark",
     "coverage": "nyc report -r lcovonly"
   },
   "main": "index.js",

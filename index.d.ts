@@ -3,7 +3,9 @@ import {
   AbstractLevel,
   AbstractIteratorOptions,
   AbstractKeyIteratorOptions,
-  AbstractValueIteratorOptions
+  AbstractValueIteratorOptions,
+  AbstractBatchOptions,
+  AbstractBatchOperation
 } from 'abstract-level'
 
 /**
@@ -73,4 +75,43 @@ declare interface LevelReadableStreamOptions {
    * [2]: https://github.com/Level/rocks-level
    */
   fillCache?: boolean | undefined
+}
+
+/**
+ * A {@link WritableStream} that that takes _operations_ or _entries_.
+ */
+export class BatchStream<K, V, TDatabase = AbstractLevel<any, any, any>>
+  extends WritableStream<AbstractBatchOperation<TDatabase, K, V> | [K, V]> {
+  /**
+   * Create a {@link WritableStream} that that takes _operations_ or _entries_, to be
+   * written to {@link db} in batches of fixed size using `db.batch()`.
+   *
+   * @param db Database to write to.
+   * @param options Options for the stream and `db.batch()`.
+   */
+  constructor (
+    db: TDatabase,
+    options?: (BatchStreamOptions & AbstractBatchOptions<K, V>) | undefined
+  )
+}
+
+/**
+ * Stream options for {@link BatchStream}.
+ */
+declare interface BatchStreamOptions {
+  /**
+   * The maximum number of operations to buffer internally before
+   * committing them to the database with `db.batch()`.
+   *
+   * @defaultValue `500`
+   */
+  highWaterMark?: number | undefined
+
+  /**
+   * Default operation `type` if not set on individual operations or entries (which can't
+   * set it).
+   *
+   * @defaultValue `'put'`
+   */
+  type?: 'put' | 'del'
 }
