@@ -2,7 +2,7 @@
 
 **Read and write to an [`abstract-level`](https://github.com/Level/abstract-level) database using [Web Streams](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API).** Compatible with browsers and Node.js.
 
-> :pushpin: To instead consume data using Node.js streams, see [`level-read-stream`](https://github.com/Level/read-stream).
+> :pushpin: To instead consume data using Node.js streams, see [`level-read-stream`](https://github.com/Level/read-stream). On Node.js 16, `level-read-stream` is ~3 times faster than `level-web-stream` and the performance of Web Streams isn't likely to improve anytime soon. On the other hand, Web Streams are a step towards a standard library for JavaScript (across Node.js, Deno and browsers).
 
 [![level badge][level-badge]](https://github.com/Level/awesome)
 [![npm](https://img.shields.io/npm/v/level-web-stream.svg)](https://www.npmjs.com/package/level-web-stream)
