@@ -115,8 +115,6 @@ An _operation_ is an object containing:
 
 An _entry_ is an array with two elements: a `key` and `value`. This allows piping a readable `EntryStream` into a writable `BatchStream`. Writing `[key, value]` is the same as writing `{ key, value }`.
 
-For smaller data sets, operations with type `'del'` are mostly useful for deleting keys that are non-contiguous (a, c) or unordered (c, a, b). If they are contiguous (a, b, c) then `db.clear({ gte: 'a', lte: 'c' })` is the faster alternative.
-
 The `db` argument must be an `abstract-level` database. The optional `options` object may contain:
 
 - `highWaterMark` (number, default 500): the maximum number of operations to buffer internally before committing them to the database with `db.batch()`. No data will be committed until `highWaterMark` is reached or until the stream is closing. Increasing `highWaterMark` can improve throughput at the cost of memory usage and at risk of blocking the JavaScript event loop while `db.batch()` is copying data.
