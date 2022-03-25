@@ -83,7 +83,7 @@ declare interface LevelReadableStreamOptions {
 export class BatchStream<K, V, TDatabase = AbstractLevel<any, any, any>>
   extends WritableStream<AbstractBatchOperation<TDatabase, K, V> | [K, V]> {
   /**
-   * Create a {@link WritableStream} that that takes _operations_ or _entries_, to be
+   * Create a {@link WritableStream} that takes _operations_ or _entries_, to be
    * written to {@link db} in batches of fixed size using `db.batch()`.
    *
    * @param db Database to write to.
